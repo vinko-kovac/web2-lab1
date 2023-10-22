@@ -1,0 +1,13 @@
+html 
+    head 
+        title Web2 Lab1
+    body
+        h1 Create new competition: 
+        form(action="/add", method="POST")
+            label(for="compname") Name:
+            input(type='text', name="compname")
+            label(for="participants") Participants(splitted by ;):
+            input(type='text', name='participants')
+            label(for="points") Points(win/draw/loss):
+            input(type='text', name='points')
+            input(type="submit", value="Add competition") 

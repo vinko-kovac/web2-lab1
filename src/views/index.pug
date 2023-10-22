@@ -1,0 +1,14 @@
+html 
+    head 
+        title Web2 Lab1
+    body
+        if username
+            h1 Welcome #{username}
+        ul 
+            li: a(href='/', title='Home') Home
+            li: a(href='/private') Private content             
+            if username
+                li: form(action="/logout", method="get")
+                    input(type="submit", value="Logout " + username)
+            else
+                li: a(href='/sign-up', title='Sign up') Sign up 
