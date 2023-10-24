@@ -40,6 +40,21 @@ const pool = new Pool({
     ssl : true
 })
 
+interface team {
+  participantid: number,
+  name: string,
+  rank: number,
+  points: number
+}
+
+interface game {
+  home: string,
+  away: string,
+  homescore: number,
+  awayscore: number,
+  week: number
+}
+
 app.use(auth(config));
 
 app.get('/',  function (req, res) {
@@ -50,15 +65,70 @@ app.get('/',  function (req, res) {
     res.render('index', {username});
 });
 
-app.get('/private', requiresAuth(), function (req, res) {       
-  const user = JSON.stringify(req.oidc.user);      
-  res.render('private'); 
+app.get('/competition/:id', async function (req,res) {
+  let result = await pool.query('SELECT competitionid, name FROM competition WHERE competitionid=$1', [req.params.id]);
+  if (result.rowCount == 0) {
+    let error = "Competition does not exist."
+    res.render('error', {error});
+  } else {
+    let id = result.rows[0].competitionid;
+    let name = result.rows[0].name;
+
+    result = await pool.query('SELECT participantid, name, points, rank FROM participant WHERE competition=$1 ORDER BY rank', [id]);
+    let teams = [];
+    for (let i = 0; i<result.rowCount; i++) {
+      let t = {participantid: result.rows[i].participantid, name: result.rows[i].name, rank: result.rows[i].rank, points: result.rows[i].points};
+      teams.push(t);
+    }
+
+    result = await pool.query('SELECT home, away, homescore, awayscore, week FROM games WHERE competition=$1 ORDER BY week', [id]);
+    let games = [];
+    //console.log(result.rowCount);
+    for (let i = 0; i<result.rowCount; i++) {
+      let h = result.rows[i].home;
+      let a = result.rows[i].away;
+      let home;
+      let away;
+      for (let j = 0; j<teams.length; j++) {
+        if (teams[j].participantid == h) {
+          home = teams[j].name;
+        } else if (teams[j].participantid == a) {
+          away = teams[j].name;
+        }
+        if (h == a) {
+          away = null;
+        }
+      }
+      let g = {home: home, away: away, homescore: result.rows[i].homescore, awayscore: result.rows[i].awayscore, week: result.rows[i].week};
+      games.push(g);
+    }
+
+    res.render('competition', {name, teams, games})
+  }
+})
+
+app.get('/private', requiresAuth(), async function (req, res) {       
+  const user = req.oidc.user?.name;
+  //console.log(user);
+  let result = await pool.query('SELECT competitionid, name FROM competition WHERE userid=$1', [user]);
+  //console.log(result);
+  let rows = [];
+  let p: [string, string];
+  let s = "https://localhost:4080";
+  for (let i = 0; i<result.rowCount; i++) {
+    //console.log(result.rows[i]);
+    p = [result.rows[i].name, s+"/competition/"+result.rows[i].competitionid];
+    rows.push(p);
+  }
+  //let rowsString = JSON.stringify(rows);
+  res.render('private', {rows}); 
 });
 
-app.post('/add', async function(req, res) {
+app.post('/add', requiresAuth(), async function(req, res) {
   const name = req.body.compname;
   const participants = req.body.participants;
   const points = req.body.points;
+  const user = req.oidc.user?.name;
   let splitted = participants.split(";");
   let pointSplit = points.split("/");
   let win = pointSplit[0];
@@ -66,11 +136,11 @@ app.post('/add', async function(req, res) {
   let lose = pointSplit[2];
   let competitors = [];
   
-  let result = await pool.query('INSERT INTO competition (name, win, draw, lose) VALUES ($1, $2, $3, $4) RETURNING *', [name, win, draw, lose]);
+  let result = await pool.query('INSERT INTO competition (name, win, draw, lose, userid) VALUES ($1, $2, $3, $4, $5) RETURNING *', [name, win, draw, lose, user]);
   //console.log(result.rows[0]);
   let id = result.rows[0].competitionid;
   for (let i = 0; i< splitted.length; i++) {
-    console.log(splitted[i]);
+    //console.log(splitted[i]);
     result = await pool.query('INSERT INTO participant (name, points, rank, competition) VALUES ($1, $2, $3, $4) RETURNING *', [splitted[i], 0, 1, id]);
     competitors.push(result.rows[0].participantid);
     //console.log(result.rows[0]);
@@ -82,6 +152,12 @@ app.post('/add', async function(req, res) {
     result = await pool.query('INSERT INTO games (home, away, competition, week) VALUES ($1, $2, $3, $4)', [competitors[(0+i)%(l-1)], competitors[l-1], id, i+1]);
     for (let j = 1; j <= (l-1)/2; j++) {
       result = await pool.query('INSERT INTO games (home, away, competition, week) VALUES ($1, $2, $3, $4)', [competitors[(j+i)%(l-1)], competitors[(l+i-j-1)%(l-1)], id, i+1]);
+    }
+  }
+  if (l%2 != 0) {
+    result = await pool.query('INSERT INTO games (home, away, competition, week) VALUES ($1, $2, $3, $4)', [competitors[l-1], competitors[l-1], id, l]);
+    for (let i = 0; i < l-2; i=i+2) {
+      result = await pool.query('INSERT INTO games (home, away, competition, week) VALUES ($1, $2, $3, $4)', [competitors[i], competitors[i+1], id, l]);
     }
   }
 

@@ -2,8 +2,15 @@ html
     head 
         title Web2 Lab1
     body
+        h1 Your competitions:
+        ul
+            //var rows = JSON.parse(rowsString)
+            each n in rows
+                li: label #{n[0]} 
+                    a(href=n[1]) #{n[1]}
         h1 Create new competition: 
         form(action="/add", method="POST")
+            //input(type='text', name="userid", value=user hidden)
             label(for="compname") Name:
             input(type='text', name="compname")
             label(for="participants") Participants(splitted by ;):
