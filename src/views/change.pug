@@ -3,6 +3,7 @@ html
         title #{name}
     body
         h1 #{name}
+        a(href='/') Home
         //-var url = "/change/" + #{id}
         form(action=url, method="POST")
             -var week = 1
