@@ -14,13 +14,14 @@ app.use(express.urlencoded({ extended: true }));
 app.set("views", path.join(__dirname, "views"));
 app.set('view engine', 'pug');
 
-const port = 4080;
+const externalUrl = process.env.RENDER_EXTERNAL_URL;
+const port = externalUrl && process.env.PORT ? parseInt(process.env.PORT) : 4080;
 
 const config = { 
     authRequired : false,
     idpLogout : true, //login not only from the app, but also from identity provider
     secret: process.env.SECRET,
-    baseURL: `https://localhost:${port}`,
+    baseURL: externalUrl || `https://localhost:${port}`,
     clientID: process.env.CLIENT_ID,
     issuerBaseURL: 'https://dev-cyykuxi4uwdrkqc8.us.auth0.com',
     clientSecret: process.env.CLIENT_SECRET,
@@ -173,10 +174,9 @@ app.get('/private', requiresAuth(), async function (req, res) {
   //console.log(result);
   let rows = [];
   let p: [string, string, string];
-  let s = "https://localhost:4080";
   for (let i = 0; i<result.rowCount; i++) {
     //console.log(result.rows[i]);
-    p = [result.rows[i].name, s+"/competition/"+result.rows[i].competitionid, s+"/changeCompetition/"+result.rows[i].competitionid];
+    p = [result.rows[i].name, externalUrl+"/competition/"+result.rows[i].competitionid, externalUrl+"/changeCompetition/"+result.rows[i].competitionid];
     rows.push(p);
   }
   //let rowsString = JSON.stringify(rows);
@@ -328,10 +328,17 @@ app.post('/change/:id', requiresAuth(), async function(req, res) {
   }
 });
 
-https.createServer({
-    key: fs.readFileSync('server.key'),
-    cert: fs.readFileSync('server.cert')
-    }, app)
-    .listen(port, function () {
-      console.log(`Server running at https://localhost:${port}/`);
-});
+if (externalUrl) {
+  const hostname = '0.0.0.0';
+  app.listen(port, hostname, () => {
+    console.log(`Server locally running at http://${hostname}:${port}/ and from outside on ${externalUrl}`);
+  });
+} else {
+  https.createServer({
+      key: fs.readFileSync('server.key'),
+      cert: fs.readFileSync('server.cert')
+      }, app)
+      .listen(port, function () {
+        console.log(`Server running at https://localhost:${port}/`);
+  });
+}
