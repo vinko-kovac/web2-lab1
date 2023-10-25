@@ -1,0 +1,32 @@
+html 
+    head 
+        title #{name}
+    body
+        h1 #{name}
+        //-var url = "/change/" + #{id}
+        form(action=url, method="POST")
+            -var week = 1
+            h3 Week: #{week}
+            each g in games
+                if (week != g.week)
+                    -week++
+                    h3 Week: #{g.week}
+                if (g.away == null)
+                    label #{g.home} - bye 
+                    br   
+                else
+                    if (g.homescore == null)
+                        label #{g.home} - #{g.away} :
+                        input(type='text', name=g.id, placeholder="0-0")
+                        input(type='text', name="id", value=g.id, hidden)
+                        br
+                    else
+                        label #{g.home} - #{g.away} :
+                        input(type='text', name=g.id, value=g.score)
+                        input(type='text', name="id", value=g.id, hidden)
+                        br
+            input(type='submit', value="Save results")
+        h2 Table
+        each t in teams
+            label #{t.rank}. #{t.name} #{t.points}
+            br
